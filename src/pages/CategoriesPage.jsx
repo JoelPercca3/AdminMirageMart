@@ -15,16 +15,22 @@ export default function CategoriesPage() {
   const [editCat, setEditCat] = useState(null);
   const queryClient = useQueryClient();
 
-  const { data: categories, isLoading } = useQuery({
+  const { data: categories, isLoading, isFetching } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: adminAPI.getCategories,
     select: (res) => res.data,
+    placeholderData: (previousData) => previousData, // Mantiene los datos previos
+    staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
   const deleteMutation = useMutation({
     mutationFn: adminAPI.deleteCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      // Invalidar pero mantener los datos previos mientras se actualiza
+      queryClient.invalidateQueries({
+        queryKey: ["admin-categories"],
+        refetchType: 'all',
+      });
       toast.success("Categoría eliminada");
     },
     onError: (err) => toast.error(err.message || "Error al eliminar"),
@@ -34,6 +40,7 @@ export default function CategoriesPage() {
     setEditCat(cat);
     setShowModal(true);
   };
+
   const handleNew = () => {
     setEditCat(null);
     setShowModal(true);
@@ -51,6 +58,7 @@ export default function CategoriesPage() {
     return result;
   };
 
+  // Usar los datos disponibles, incluso si están cargando
   const flatCategories = buildTreeWithLevel(categories || []);
 
   return (
@@ -60,6 +68,9 @@ export default function CategoriesPage() {
           <h1 className="text-xl font-bold text-gray-800">Categorías</h1>
           <p className="text-sm text-gray-500">
             {categories?.length || 0} categorías en total
+            {isFetching && !isLoading && (
+              <span className="ml-2 text-xs text-gray-400">(Actualizando...)</span>
+            )}
           </p>
         </div>
         <Button onClick={handleNew}>
@@ -125,11 +136,10 @@ export default function CategoriesPage() {
                   </td>
                   <td className="py-3 px-4">
                     <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        cat.activo
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cat.activo
                           ? "bg-green-100 text-green-700"
                           : "bg-gray-100 text-gray-500"
-                      }`}
+                        }`}
                     >
                       {cat.activo ? "Activa" : "Inactiva"}
                     </span>
@@ -162,12 +172,21 @@ export default function CategoriesPage() {
 
       <CategoryModal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          // Limpiar el estado de edición al cerrar
+          setEditCat(null);
+        }}
         category={editCat}
         categories={categories || []}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+          // Invalidar la query para que se actualice
+          queryClient.invalidateQueries({
+            queryKey: ["admin-categories"],
+            refetchType: 'all',
+          });
           setShowModal(false);
+          setEditCat(null);
         }}
       />
     </div>
@@ -178,6 +197,13 @@ function CategoryModal({ isOpen, onClose, category, categories, onSuccess }) {
   const { register, handleSubmit, reset } = useForm({
     defaultValues: category || { activo: 1 },
   });
+
+  // Resetear el formulario cuando se abre con una categoría diferente
+  useState(() => {
+    if (isOpen) {
+      reset(category || { activo: 1 });
+    }
+  }, [isOpen, category, reset]);
 
   // Obtener categorías principales (sin padre) para el select
   const mainCategories = categories.filter((c) => !c.parent_id);
