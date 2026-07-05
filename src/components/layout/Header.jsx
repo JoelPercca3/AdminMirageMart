@@ -1,45 +1,108 @@
 import { useLocation } from "react-router-dom";
-import { Bell, ExternalLink } from "lucide-react";
+import { Bell, ExternalLink, ChevronRight, Home } from "lucide-react";
 import useAdminStore from "../../store/useAdminStore.js";
 
-const PAGE_TITLES = {
-  "/dashboard": "Dashboard",
-  "/products": "Productos",
-  "/orders": "Pedidos",
-  "/users": "Usuarios",
-  "/categories": "Categorías",
-  "/coupons": "Cupones",
-  "/reviews": "Reseñas",
-  "/settings": "Configuración",
+const PAGE_META = {
+  "/dashboard": { title: "Dashboard", section: null },
+  "/products": { title: "Productos", section: "Catálogo" },
+  "/orders": { title: "Pedidos", section: "Ventas" },
+  "/users": { title: "Usuarios", section: "Ventas" },
+  "/categories": { title: "Categorías", section: "Catálogo" },
+  "/coupons": { title: "Cupones", section: "Catálogo" },
+  "/reviews": { title: "Reseñas", section: "Ventas" },
+  "/promos": { title: "Promociones", section: "Catálogo" },
+  "/settings": { title: "Configuración", section: "Sistema" },
 };
 
 export default function Header() {
   const { pathname } = useLocation();
   const { user } = useAdminStore();
 
-  return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-      <h2 className="text-lg font-bold text-gray-800">
-        {PAGE_TITLES[pathname] || "Admin"}
-      </h2>
+  const meta = PAGE_META[pathname] ?? { title: "Admin", section: null };
 
-      <div className="flex items-center gap-3">
+  return (
+    <header
+      className="bg-white flex items-center justify-between px-6 flex-shrink-0"
+      style={{
+        height: "52px",
+        borderBottom: "0.5px solid #e5e7eb",
+      }}
+    >
+      {/* Breadcrumb + título */}
+      <div className="flex items-center gap-1.5 text-[12px]" style={{ color: "#9ca3af" }}>
+        <Home size={13} />
+        {meta.section && (
+          <>
+            <ChevronRight size={11} />
+            <span>{meta.section}</span>
+          </>
+        )}
+        <ChevronRight size={11} />
+        <span className="text-[14px] font-semibold" style={{ color: "#111827" }}>
+          {meta.title}
+        </span>
+      </div>
+
+      {/* Acciones */}
+      <div className="flex items-center gap-2">
+
+        {/* Ver tienda */}
         <a
           href="http://localhost:3000"
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
+          className="flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg transition-colors duration-150"
+          style={{
+            color: "#6b7280",
+            border: "0.5px solid #e5e7eb",
+            background: "#fff",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f9fafb";
+            e.currentTarget.style.color = "#374151";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#fff";
+            e.currentTarget.style.color = "#6b7280";
+          }}
         >
-          <ExternalLink size={15} />
+          <ExternalLink size={13} />
           Ver tienda
         </a>
 
-        <button className="relative p-2 hover:bg-gray-100 rounded-lg transition">
-          <Bell size={18} className="text-gray-500" />
+        {/* Notificaciones */}
+        <button
+          className="flex items-center justify-center rounded-lg transition-colors duration-150"
+          style={{
+            width: "32px",
+            height: "32px",
+            border: "0.5px solid #e5e7eb",
+            background: "#fff",
+            color: "#6b7280",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f9fafb";
+            e.currentTarget.style.color = "#374151";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#fff";
+            e.currentTarget.style.color = "#6b7280";
+          }}
+        >
+          <Bell size={15} />
         </button>
 
-        <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
-          {user?.nombre?.[0]?.toUpperCase()}
+        {/* Avatar */}
+        <div
+          className="flex items-center justify-center text-[12px] font-bold rounded-lg flex-shrink-0"
+          style={{
+            width: "32px",
+            height: "32px",
+            background: "#7f1d1d",
+            color: "#fca5a5",
+          }}
+        >
+          {user?.nombre?.[0]?.toUpperCase() ?? "A"}
         </div>
       </div>
     </header>

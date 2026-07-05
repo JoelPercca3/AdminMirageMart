@@ -11,6 +11,9 @@ import CouponsPage from "./pages/CouponsPage.jsx";
 import ReviewsPage from "./pages/ReviewsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import PromosPage from "./pages/PromosPage.jsx";
+import ContactMessagesPage from "./pages/ContactMessagesPage.jsx";
+import LibroReclamacionesPage from "./pages/LibroReclamacionesPage.jsx";
+import NewsletterSubscribersPage from "./pages/NewsletterSubscribersPage.jsx";
 
 function ProtectedRoute({ children }) {
   const token = useAdminStore((s) => s.token);
@@ -39,6 +42,9 @@ export default function App() {
         <Route path="coupons" element={<CouponsPage />} />
         <Route path="reviews" element={<ReviewsPage />} />
         <Route path="promos" element={<PromosPage />} />
+        <Route path="contact-messages" element={<ContactMessagesPage />} />
+        <Route path="libro-reclamaciones" element={<LibroReclamacionesPage />} />
+        <Route path="newsletter-subscribers" element={<NewsletterSubscribersPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

@@ -69,6 +69,25 @@ export const adminAPI = {
   getReviews: (params) => api.get("/admin/reviews", { params }),
   approveReview: (id) => api.patch(`/admin/reviews/${id}/approve`),
 
+  // Mensajes de contacto
+  getContactMessages: (params) =>
+    api.get("/admin/contact-messages", { params }),
+  markContactMessageRead: (id, leido) =>
+    api.patch(`/admin/contact-messages/${id}/read`, { leido }),
+
+  // Libro de reclamaciones
+  getLibroReclamaciones: (params) =>
+    api.get("/admin/libro-reclamaciones", { params }),
+  getLibroReclamacionItem: (id) => api.get(`/admin/libro-reclamaciones/${id}`),
+  responderLibroReclamacion: (id, respuesta) =>
+    api.patch(`/admin/libro-reclamaciones/${id}/responder`, { respuesta }),
+
+  // Newsletter
+  getNewsletterSubscribers: (params) =>
+    api.get("/admin/newsletter-subscribers", { params }),
+  setNewsletterSubscriberStatus: (id, activo) =>
+    api.patch(`/admin/newsletter-subscribers/${id}/status`, { activo }),
+
   // Upload — rutas separadas por contexto
   uploadImage: (
     formData, // ← productos (admin)
