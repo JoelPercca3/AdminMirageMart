@@ -88,6 +88,10 @@ export const adminAPI = {
   setNewsletterSubscriberStatus: (id, activo) =>
     api.patch(`/admin/newsletter-subscribers/${id}/status`, { activo }),
 
+  // Marcas
+  getBrands: () => api.get("/admin/brands"),
+  createBrand: (nombre) => api.post("/admin/brands", { nombre }),
+
   // Upload — rutas separadas por contexto
   uploadImage: (
     formData, // ← productos (admin)

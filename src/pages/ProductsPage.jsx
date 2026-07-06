@@ -461,12 +461,14 @@ export default function ProductsPage() {
   );
 }
 
-// ── Modal de producto (sin cambios funcionales) ────────────
+// ── Modal de producto ────────────────────────────────
 function ProductModal({ isOpen, onClose, product, onSuccess }) {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [baseImages, setBaseImages] = useState([]);
   const [atributos, setAtributos] = useState([]);
   const [variantes, setVariantes] = useState([]);
+  const [newBrandName, setNewBrandName] = useState("");
+  const queryClient = useQueryClient();
 
   const COLORES_PRESET = ["Negro", "Blanco", "Azul", "Rojo", "Verde", "Rosado", "Gris", "Beige", "Morado", "Naranja", "Amarillo", "Café"];
   const TALLAS_PRESET = ["XS", "S", "M", "L", "XL", "XXL", "28", "30", "32", "34", "36", "38", "40"];
@@ -478,11 +480,11 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
   const [usaColores, setUsaColores] = useState(false);
   const [usaTallas, setUsaTallas] = useState(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       nombre: "", descripcion: "", sku: "",
       precio_base: "", stock_total: "", estado: "borrador",
-      es_destacado: false, es_nuevo: false,
+      es_destacado: false, es_nuevo: false, brand_id: "",
     },
   });
 
@@ -492,6 +494,29 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
     select: (res) => res.data,
   });
 
+  // ✅ Marcas disponibles
+  const { data: brands } = useQuery({
+    queryKey: ["admin-brands"],
+    queryFn: adminAPI.getBrands,
+    select: (res) => res.data,
+  });
+
+  const createBrandMutation = useMutation({
+    mutationFn: adminAPI.createBrand,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-brands"] });
+      setValue("brand_id", res.data.id);
+      setNewBrandName("");
+      toast.success(res.message || "Marca creada");
+    },
+    onError: (err) => toast.error(err.message || "Error al crear la marca"),
+  });
+
+  const handleAddBrand = () => {
+    if (!newBrandName.trim()) return;
+    createBrandMutation.mutate(newBrandName.trim());
+  };
+
   // Cargar datos del producto al editar
   useEffect(() => {
     if (product) {
@@ -500,6 +525,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
         descripcion: product.descripcion || "",
         descripcion_corta: product.descripcion_corta || "",
         category_id: product.category_id || "",
+        brand_id: product.brand_id || "",
         sku: product.sku || "",
         precio_base: product.precio_base || "",
         precio_oferta: product.precio_oferta || "",
@@ -567,6 +593,43 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
     setCustomTalla("");
   };
 
+  // ✅ Regenera la tabla de combinaciones cada vez que cambian los colores o
+  // tallas seleccionadas. Antes esto no existía — por eso "no pasaba nada"
+  // al agregar una talla/color nuevo. Se preservan stock/precio/SKU/id de
+  // las combinaciones que ya existían, para no perder datos ya guardados.
+  useEffect(() => {
+    const coloresActivos = usaColores ? selectedColores : [];
+    const tallasActivas = usaTallas ? selectedTallas : [];
+
+    let combos = [];
+    if (coloresActivos.length > 0 && tallasActivas.length > 0) {
+      combos = coloresActivos.flatMap((c) => tallasActivas.map((t) => ({ Color: c, Talla: t })));
+    } else if (coloresActivos.length > 0) {
+      combos = coloresActivos.map((c) => ({ Color: c }));
+    } else if (tallasActivas.length > 0) {
+      combos = tallasActivas.map((t) => ({ Talla: t }));
+    }
+
+    setVariantes((prev) =>
+      combos.map((opciones) => {
+        const existente = prev.find(
+          (v) => JSON.stringify(v.opciones) === JSON.stringify(opciones),
+        );
+        if (existente) return existente;
+        return {
+          id: undefined,
+          sku_variante: "",
+          opciones,
+          precio_extra: 0,
+          stock: 0,
+          imagen_url: "",
+          activo: 1,
+        };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedColores, selectedTallas, usaColores, usaTallas]);
+
   const updateVariante = (index, field, value) => {
     const nuevos = [...variantes];
     nuevos[index][field] = value;
@@ -603,7 +666,6 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
     const n = [...atributos]; n[i][field] = value; setAtributos(n);
   };
 
-  const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (data) => product ? adminAPI.updateProduct(product.id, data) : adminAPI.createProduct(data),
     onSuccess: () => { toast.success(product ? "Producto actualizado" : "Producto creado"); queryClient.invalidateQueries({ queryKey: ["admin-products"] }); onSuccess(); },
@@ -622,6 +684,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
       descripcion: data.descripcion || "",
       descripcion_corta: data.descripcion_corta || data.descripcion || "",
       category_id: Number(data.category_id),
+      brand_id: data.brand_id ? Number(data.brand_id) : null,
       precio_base: Number(data.precio_base),
       precio_oferta: data.precio_oferta ? Number(data.precio_oferta) : null,
       sku: data.sku,
@@ -670,6 +733,37 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
               {categories?.map((cat) => <option key={cat.id} value={cat.id}>{cat.nombre}</option>)}
             </select>
           </div>
+
+          {/* ✅ Marca — opcional, con creación al vuelo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Marca <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-gray-800"
+              {...register("brand_id")}>
+              <option value="">Sin marca</option>
+              {brands?.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+            </select>
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="+ Crear marca nueva..."
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddBrand())}
+                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-gray-800"
+              />
+              <button
+                type="button"
+                onClick={handleAddBrand}
+                disabled={createBrandMutation.isPending}
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium transition disabled:opacity-50"
+              >
+                Agregar
+              </button>
+            </div>
+          </div>
+
           <Input label="SKU" placeholder="Ej: POL-001" error={errors.sku?.message}
             {...register("sku", { required: "El SKU es requerido" })} />
           <Input label="Precio base (S/)" type="number" step="0.01" placeholder="0.00"
