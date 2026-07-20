@@ -14,6 +14,10 @@ import PromosPage from "./pages/PromosPage.jsx";
 import ContactMessagesPage from "./pages/ContactMessagesPage.jsx";
 import LibroReclamacionesPage from "./pages/LibroReclamacionesPage.jsx";
 import NewsletterSubscribersPage from "./pages/NewsletterSubscribersPage.jsx";
+import RefundRequestsPage from "./pages/RefundRequestsPage.jsx";
+import ReturnRequestsPage from "./pages/ReturnRequestsPage.jsx";
+import AttributesPage from "./pages/AttributesPage.jsx";
+import BannersPage from "./pages/BannersPage.jsx";
 
 function ProtectedRoute({ children }) {
   const token = useAdminStore((s) => s.token);
@@ -36,16 +40,21 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />
+        <Route path="attributes" element={<AttributesPage />} />
         <Route path="orders" element={<OrdersPage />} />
+        <Route path="refund-requests" element={<RefundRequestsPage />} />
+        <Route path="return-requests" element={<ReturnRequestsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="coupons" element={<CouponsPage />} />
         <Route path="reviews" element={<ReviewsPage />} />
         <Route path="promos" element={<PromosPage />} />
+        <Route path="banners" element={<BannersPage />} />
         <Route path="contact-messages" element={<ContactMessagesPage />} />
         <Route path="libro-reclamaciones" element={<LibroReclamacionesPage />} />
         <Route path="newsletter-subscribers" element={<NewsletterSubscribersPage />} />
         <Route path="settings" element={<SettingsPage />} />
+
       </Route>
     </Routes>
   );

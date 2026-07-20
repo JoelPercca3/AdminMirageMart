@@ -35,7 +35,7 @@ export default function LoginPage() {
         toast.error("No tienes permisos de administrador");
         return;
       }
-      setAuth(res.data.user, res.data.tokens.accessToken);
+      setAuth(res.data.user, res.data.accessToken);
       toast.success("¡Bienvenido al panel admin!");
       navigate("/dashboard");
     },

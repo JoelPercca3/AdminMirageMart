@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Plus, Edit, Trash2, Grid3x3 } from "lucide-react";
+import { Plus, Edit, Trash2, Grid3x3, SlidersHorizontal } from "lucide-react";
 import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { adminAPI } from "../api/admin.api.js";
@@ -13,20 +13,22 @@ import Spinner from "../components/ui/Spinner.jsx";
 export default function CategoriesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editCat, setEditCat] = useState(null);
+  const [showAttrModal, setShowAttrModal] = useState(false);
+  const [attrCategory, setAttrCategory] = useState(null);
+
   const queryClient = useQueryClient();
 
   const { data: categories, isLoading, isFetching } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: adminAPI.getCategories,
     select: (res) => res.data,
-    placeholderData: (previousData) => previousData, // Mantiene los datos previos
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    placeholderData: (previousData) => previousData,
+    staleTime: 5 * 60 * 1000,
   });
 
   const deleteMutation = useMutation({
     mutationFn: adminAPI.deleteCategory,
     onSuccess: () => {
-      // Invalidar pero mantener los datos previos mientras se actualiza
       queryClient.invalidateQueries({
         queryKey: ["admin-categories"],
         refetchType: 'all',
@@ -46,6 +48,11 @@ export default function CategoriesPage() {
     setShowModal(true);
   };
 
+  const handleManageAttributes = (cat) => {
+    setAttrCategory(cat);
+    setShowAttrModal(true);
+  };
+
   // Construir el árbol para mostrar con indentación
   const buildTreeWithLevel = (cats, parentId = null, level = 0) => {
     const result = [];
@@ -58,7 +65,6 @@ export default function CategoriesPage() {
     return result;
   };
 
-  // Usar los datos disponibles, incluso si están cargando
   const flatCategories = buildTreeWithLevel(categories || []);
 
   return (
@@ -137,8 +143,8 @@ export default function CategoriesPage() {
                   <td className="py-3 px-4">
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cat.activo
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
                         }`}
                     >
                       {cat.activo ? "Activa" : "Inactiva"}
@@ -146,6 +152,14 @@ export default function CategoriesPage() {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex justify-end gap-1">
+                      {/* ✅ Botón Gestionar Atributos */}
+                      <button
+                        onClick={() => handleManageAttributes(cat)}
+                        className="p-1.5 hover:bg-purple-50 rounded-lg transition"
+                        title="Gestionar atributos"
+                      >
+                        <SlidersHorizontal size={15} className="text-purple-500" />
+                      </button>
                       <button
                         onClick={() => handleEdit(cat)}
                         className="p-1.5 hover:bg-blue-50 rounded-lg transition"
@@ -174,13 +188,11 @@ export default function CategoriesPage() {
         isOpen={showModal}
         onClose={() => {
           setShowModal(false);
-          // Limpiar el estado de edición al cerrar
           setEditCat(null);
         }}
         category={editCat}
         categories={categories || []}
         onSuccess={() => {
-          // Invalidar la query para que se actualice
           queryClient.invalidateQueries({
             queryKey: ["admin-categories"],
             refetchType: 'all',
@@ -189,10 +201,21 @@ export default function CategoriesPage() {
           setEditCat(null);
         }}
       />
+
+      {/* ✅ Modal de Atributos de Categoría */}
+      <CategoryAttributesModal
+        isOpen={showAttrModal}
+        onClose={() => {
+          setShowAttrModal(false);
+          setAttrCategory(null);
+        }}
+        category={attrCategory}
+      />
     </div>
   );
 }
 
+// ─── MODAL DE CATEGORÍA ──────────────────────────────────────────────────────
 function CategoryModal({ isOpen, onClose, category, categories, onSuccess }) {
   const { register, handleSubmit, reset } = useForm({
     defaultValues: category || { activo: 1 },
@@ -205,7 +228,6 @@ function CategoryModal({ isOpen, onClose, category, categories, onSuccess }) {
     }
   }, [isOpen, category, reset]);
 
-  // Obtener categorías principales (sin padre) para el select
   const mainCategories = categories.filter((c) => !c.parent_id);
 
   const mutation = useMutation({
@@ -280,6 +302,148 @@ function CategoryModal({ isOpen, onClose, category, categories, onSuccess }) {
           </Button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+// ─── MODAL DE ATRIBUTOS DE CATEGORÍA ────────────────────────────────────────
+function CategoryAttributesModal({ isOpen, onClose, category }) {
+  const queryClient = useQueryClient();
+
+  // Todos los atributos existentes (catálogo maestro)
+  const { data: allAttributes } = useQuery({
+    queryKey: ["admin-attributes"],
+    queryFn: adminAPI.getAttributes,
+    select: (res) => res.data,
+    enabled: isOpen,
+  });
+
+  // Atributos ya asociados a esta categoría
+  const { data: categoryAttributes, isLoading } = useQuery({
+    queryKey: ["admin-category-attributes", category?.id],
+    queryFn: () => adminAPI.getCategoryAttributes(category.id),
+    select: (res) => res.data,
+    enabled: isOpen && !!category?.id,
+  });
+
+  // Modificar la mutación para enviar es_requerido
+  const assignMutation = useMutation({
+    mutationFn: ({ attribute_id, es_requerido = false }) =>
+      adminAPI.assignAttributeToCategory(category.id, {
+        attribute_id,
+        es_requerido
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin-category-attributes", category?.id]
+      });
+      toast.success("Atributo actualizado correctamente");
+    },
+    onError: (err) => toast.error(err.message || "Error al actualizar"),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (attributeId) =>
+      adminAPI.removeAttributeFromCategory(category.id, attributeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin-category-attributes", category?.id]
+      });
+      toast.success("Atributo removido correctamente");
+    },
+    onError: (err) => toast.error(err.message || "Error al quitar"),
+  });
+
+  // Crear Set y Map para manejar asignación y estado requerido
+  const assignedIds = new Set((categoryAttributes || []).map((a) => a.id));
+  const requeridoMap = new Map(
+    (categoryAttributes || []).map((a) => [a.id, a.es_requerido])
+  );
+
+  const toggleAttribute = (attributeId) => {
+    if (assignedIds.has(attributeId)) {
+      removeMutation.mutate(attributeId);
+    } else {
+      assignMutation.mutate({
+        attribute_id: attributeId,
+        es_requerido: false
+      });
+    }
+  };
+
+  // Nueva función para toggle de "Requerido"
+  const toggleRequerido = (attributeId, currentValue) => {
+    assignMutation.mutate({
+      attribute_id: attributeId,
+      es_requerido: !currentValue
+    });
+  };
+
+  if (!category) return null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Atributos de "${category.nombre}"`}
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-gray-500">
+          Marca qué atributos aplican a esta categoría. Aparecerán como filtros
+          en el sidebar público y como campos al crear productos de esta categoría.
+        </p>
+
+        {isLoading ? (
+          <Spinner />
+        ) : !allAttributes?.length ? (
+          <p className="text-sm text-gray-400 py-4 text-center">
+            No hay atributos creados todavía. Ve a "Atributos" en el menú para crear uno.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
+            {allAttributes.map((attr) => {
+              const isAssigned = assignedIds.has(attr.id);
+              const esRequerido = requeridoMap.get(attr.id);
+
+              return (
+                <div
+                  key={attr.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isAssigned}
+                    onChange={() => toggleAttribute(attr.id)}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-800">{attr.nombre}</p>
+                    <p className="text-xs text-gray-400">
+                      {attr.tipo === "variante"
+                        ? "Variante (afecta stock)"
+                        : "Especificación (filtro)"}
+                    </p>
+                  </div>
+                  {isAssigned && (
+                    <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!esRequerido}
+                        onChange={() => toggleRequerido(attr.id, esRequerido)}
+                      />
+                      Requerido
+                    </label>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-2">
+          <Button type="button" onClick={onClose}>Listo</Button>
+        </div>
+      </div>
     </Modal>
   );
 }

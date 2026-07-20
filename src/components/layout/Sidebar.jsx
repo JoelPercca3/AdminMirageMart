@@ -14,6 +14,10 @@ import {
   MessageCircle,
   ClipboardList,
   Mail,
+  RefreshCw,
+  ArrowLeftRight,
+  SlidersHorizontal,
+  Image,// ✅ nuevo — para Atributos
 } from "lucide-react";
 import useAdminStore from "../../store/useAdminStore.js";
 
@@ -29,14 +33,19 @@ const NAV_SECTIONS = [
     items: [
       { to: "/products", icon: Package, label: "Productos" },
       { to: "/categories", icon: Grid3x3, label: "Categorías" },
+      { to: "/attributes", icon: SlidersHorizontal, label: "Atributos" }, // ✅ nuevo
       { to: "/coupons", icon: Tag, label: "Cupones" },
       { to: "/promos", icon: Megaphone, label: "Promociones" },
+      { to: "/banners", icon: Image, label: "Banners" }, // ✅ nuevo, aquí adentro
+
     ],
   },
   {
     label: "Ventas",
     items: [
       { to: "/orders", icon: ShoppingBag, label: "Pedidos" },
+      { to: "/refund-requests", icon: RefreshCw, label: "Solicitudes de reembolso" },
+      { to: "/return-requests", icon: ArrowLeftRight, label: "Solicitudes de devolución" }, // ✅ NUEVO
       { to: "/users", icon: Users, label: "Usuarios" },
       { to: "/reviews", icon: Star, label: "Reseñas" },
     ],

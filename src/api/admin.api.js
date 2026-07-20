@@ -27,9 +27,14 @@ export const adminAPI = {
   getOrder: (id) => api.get(`/admin/orders/${id}`),
   updateStatus: (id, estado, comentario) =>
     api.patch(`/admin/orders/${id}/status`, { estado, comentario }),
-  updateTracking: (id, tracking_number) =>
-    api.patch(`/admin/orders/${id}/tracking`, { tracking_number }),
-
+  updateTracking: (id, tracking_number, courier, clave_recojo) =>
+    api.patch(`/admin/orders/${id}/tracking`, {
+      tracking_number,
+      courier,
+      clave_recojo,
+    }),
+  refundOrder: (charge_id, order_id, amount, reason) =>
+    api.post("/payments/refund", { charge_id, order_id, amount, reason }),
   // Usuarios
   getUsers: (params) => api.get("/admin/users", { params }),
   getUser: (id) => api.get(`/admin/users/${id}`),
@@ -51,10 +56,10 @@ export const adminAPI = {
   deleteCoupon: (id) => api.delete(`/admin/coupons/${id}`),
 
   // Banners
-  getBanners: () => api.get("/admin/banners"),
-  createBanner: (data) => api.post("/admin/banners", data),
-  updateBanner: (id, data) => api.put(`/admin/banners/${id}`, data),
-  deleteBanner: (id) => api.delete(`/admin/banners/${id}`),
+  getAllBanners: () => api.get("/banners/admin/all"),
+  createBanner: (data) => api.post("/banners/admin", data),
+  updateBanner: (id, data) => api.put(`/banners/admin/${id}`, data),
+  deleteBanner: (id) => api.delete(`/banners/admin/${id}`),
 
   // Settings
   getSettings: () => api.get("/admin/settings"),
@@ -123,4 +128,33 @@ export const adminAPI = {
     api.put(`/admin/variants/images/${imageId}/primary`),
   getVariantImages: (variantId) =>
     api.get(`/admin/variants/${variantId}/images`),
+
+  getRefundRequests: (params) => api.get("/refund-requests", { params }),
+  approveRefundRequest: (id) => api.patch(`/refund-requests/${id}/approve`),
+  rejectRefundRequest: (id, respuesta_admin) =>
+    api.patch(`/refund-requests/${id}/reject`, { respuesta_admin }),
+
+  getReturnRequests: (params) => api.get("/return-requests", { params }),
+  approveReturnRequest: (id, instrucciones_admin) =>
+    api.patch(`/return-requests/${id}/approve`, { instrucciones_admin }),
+  rejectReturnRequest: (id, respuesta_admin) =>
+    api.patch(`/return-requests/${id}/reject`, { respuesta_admin }),
+  markReturnReceived: (id) => api.patch(`/return-requests/${id}/received`),
+  confirmReturnRefund: (id) =>
+    api.patch(`/return-requests/${id}/confirm-refund`),
+
+  // ─── Atributos ──────────────────────────────────────────────────────────────
+  getAttributes: () => api.get("/attributes"),
+  createAttribute: (data) => api.post("/attributes", data),
+  updateAttribute: (id, data) => api.put(`/attributes/${id}`, data),
+  deleteAttribute: (id) => api.delete(`/attributes/${id}`),
+
+  getCategoryAttributes: (categoryId) =>
+    api.get(`/attributes/categories/${categoryId}/attributes`),
+  assignAttributeToCategory: (categoryId, data) =>
+    api.post(`/attributes/categories/${categoryId}/attributes`, data),
+  removeAttributeFromCategory: (categoryId, attributeId) =>
+    api.delete(
+      `/attributes/categories/${categoryId}/attributes/${attributeId}`,
+    ),
 };

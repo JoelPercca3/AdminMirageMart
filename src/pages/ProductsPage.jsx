@@ -67,6 +67,55 @@ function StatCard({ icon: Icon, label, value, meta, metaDown = false, iconBg = "
   );
 }
 
+// ── Componente DynamicAttributeInput ───────────────────────
+function DynamicAttributeInput({ definition, valores, onChange }) {
+  const [inputValue, setInputValue] = useState("");
+
+  const addValue = () => {
+    const v = inputValue.trim();
+    if (!v || valores.includes(v)) return;
+    onChange([...valores, v]);
+    setInputValue("");
+  };
+
+  const removeValue = (v) => {
+    onChange(valores.filter((val) => val !== v));
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-3">
+      <p className="text-xs font-semibold text-gray-600 mb-2">
+        {definition.nombre}
+        {definition.es_requerido && <span className="text-red-500 ml-1">*</span>}
+      </p>
+      {valores.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {valores.map((v) => (
+            <span key={v} className="flex items-center gap-1 bg-gray-100 text-xs px-2 py-1 rounded-full">
+              {v}
+              <button type="button" onClick={() => removeValue(v)} className="text-gray-400 hover:text-red-500">
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder={`Agregar valor (ej: iPhone 13)...`}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addValue())}
+          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-gray-800"
+        />
+        <button type="button" onClick={addValue} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium transition">
+          + Agregar
+        </button>
+      </div>
+    </div>
+  );
+}
 // ── Página principal ───────────────────────────────────────
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
@@ -461,6 +510,18 @@ export default function ProductsPage() {
   );
 }
 
+// ─── Función auxiliar para construir jerarquía de categorías ──────────────
+function buildCategoryOptions(cats, parentId = null, level = 0) {
+  const result = [];
+  cats
+    ?.filter((cat) => cat.parent_id === parentId)
+    .forEach((cat) => {
+      result.push({ ...cat, level });
+      result.push(...buildCategoryOptions(cats, cat.id, level + 1));
+    });
+  return result;
+}
+
 // ── Modal de producto ────────────────────────────────
 function ProductModal({ isOpen, onClose, product, onSuccess }) {
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -516,6 +577,20 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
     if (!newBrandName.trim()) return;
     createBrandMutation.mutate(newBrandName.trim());
   };
+
+  // ✅ Obtener la categoría seleccionada en tiempo real
+  const selectedCategoryId = watch("category_id");
+
+  // ✅ Query para traer los atributos de esa categoría
+  const { data: categoryAttrDefs } = useQuery({
+    queryKey: ["category-attributes", selectedCategoryId],
+    queryFn: () => adminAPI.getCategoryAttributes(selectedCategoryId),
+    select: (res) => res.data,
+    enabled: !!selectedCategoryId,
+  });
+
+  // Solo nos interesan los tipo "spec" para este input dinámico
+  const specAttrDefs = (categoryAttrDefs || []).filter((a) => a.tipo === "spec");
 
   // Cargar datos del producto al editar
   useEffect(() => {
@@ -666,6 +741,18 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
     const n = [...atributos]; n[i][field] = value; setAtributos(n);
   };
 
+  // ✅ Manejar cambio de valores de atributos dinámicos
+  const handleDynamicAttributeChange = (defId, nuevosValores) => {
+    // Quita las entradas viejas de este attribute_id y agrega las nuevas
+    const sinEste = atributos.filter((a) => a.attribute_id !== defId);
+    const nuevas = nuevosValores.map((v) => ({
+      atributo: specAttrDefs.find((d) => d.id === defId)?.nombre || "",
+      valor: v,
+      attribute_id: defId,
+    }));
+    setAtributos([...sinEste, ...nuevas]);
+  };
+
   const mutation = useMutation({
     mutationFn: (data) => product ? adminAPI.updateProduct(product.id, data) : adminAPI.createProduct(data),
     onSuccess: () => { toast.success(product ? "Producto actualizado" : "Producto creado"); queryClient.invalidateQueries({ queryKey: ["admin-products"] }); onSuccess(); },
@@ -682,7 +769,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
     const submitData = {
       nombre: data.nombre,
       descripcion: data.descripcion || "",
-      descripcion_corta: data.descripcion_corta || data.descripcion || "",
+      descripcion_corta: (data.descripcion_corta || data.descripcion || "").slice(0, 500),
       category_id: Number(data.category_id),
       brand_id: data.brand_id ? Number(data.brand_id) : null,
       precio_base: Number(data.precio_base),
@@ -730,7 +817,11 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
             <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-gray-800"
               {...register("category_id", { required: true })}>
               <option value="">Seleccionar...</option>
-              {categories?.map((cat) => <option key={cat.id} value={cat.id}>{cat.nombre}</option>)}
+              {buildCategoryOptions(categories).map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {"—".repeat(cat.level)} {cat.nombre}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -819,29 +910,59 @@ function ProductModal({ isOpen, onClose, product, onSuccess }) {
           )}
         </div>
 
-        {/* Atributos */}
+        {/* ✅ Atributos dinámicos según categoría (ej. Modelo compatible) */}
+        {specAttrDefs.length > 0 && (
+          <div className="mb-4">
+            <label className="text-sm font-medium text-gray-700 block mb-2">
+              Atributos de esta categoría
+            </label>
+            <div className="flex flex-col gap-3">
+              {specAttrDefs.map((def) => {
+                // Valores actuales asignados a este attribute_id dentro de `atributos`
+                const valoresActuales = atributos
+                  .filter((a) => a.attribute_id === def.id)
+                  .map((a) => a.valor);
+
+                return (
+                  <DynamicAttributeInput
+                    key={def.id}
+                    definition={def}
+                    valores={valoresActuales}
+                    onChange={(nuevosValores) => handleDynamicAttributeChange(def.id, nuevosValores)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ✅ Atributos libres (texto libre, sin categoría asociada) */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">Atributos / Especificaciones</label>
+            <label className="text-sm font-medium text-gray-700">Otros atributos / Especificaciones</label>
             <button type="button" onClick={addAtributo} className="text-xs text-gray-600 hover:text-gray-900 font-medium flex items-center gap-1">
               <Plus size={13} /> Agregar
             </button>
           </div>
-          {atributos.length === 0 && <p className="text-xs text-gray-400 mb-2">Ej: Material, Garantía, Batería...</p>}
+          {atributos.filter((a) => !a.attribute_id).length === 0 && (
+            <p className="text-xs text-gray-400 mb-2">Ej: Material, Garantía, Batería...</p>
+          )}
           <div className="flex flex-col gap-2">
-            {atributos.map((attr, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <input type="text" placeholder="Atributo" value={attr.atributo}
-                  onChange={(e) => updateAtributo(i, "atributo", e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-gray-800" />
-                <input type="text" placeholder="Valor" value={attr.valor}
-                  onChange={(e) => updateAtributo(i, "valor", e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-gray-800" />
-                <button type="button" onClick={() => removeAtributo(i)} className="p-2 text-gray-400 hover:text-red-500 transition">
-                  <X size={15} />
-                </button>
-              </div>
-            ))}
+            {atributos.map((attr, i) =>
+              attr.attribute_id ? null : ( // ✅ solo mostramos aquí los que NO son dinámicos
+                <div key={i} className="flex gap-2 items-center">
+                  <input type="text" placeholder="Atributo" value={attr.atributo}
+                    onChange={(e) => updateAtributo(i, "atributo", e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-gray-800" />
+                  <input type="text" placeholder="Valor" value={attr.valor}
+                    onChange={(e) => updateAtributo(i, "valor", e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-gray-800" />
+                  <button type="button" onClick={() => removeAtributo(i)} className="p-2 text-gray-400 hover:text-red-500 transition">
+                    <X size={15} />
+                  </button>
+                </div>
+              )
+            )}
           </div>
         </div>
 

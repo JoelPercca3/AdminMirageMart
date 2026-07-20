@@ -1,9 +1,9 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Save, Plus, Edit } from "lucide-react";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { adminAPI } from "../api/admin.api.js";
 import Button from "../components/ui/Button.jsx";
 import Input from "../components/ui/Input.jsx";
@@ -48,11 +48,10 @@ export default function SettingsPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition capitalize ${
-              activeTab === tab
-                ? "border-red-500 text-red-500"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition capitalize ${activeTab === tab
+              ? "border-red-500 text-red-500"
+              : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
           >
             {tab === "general" ? "General" : "Métodos de envío"}
           </button>
@@ -185,11 +184,10 @@ export default function SettingsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <span
-                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            method.activo
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${method.activo
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
+                            }`}
                         >
                           {method.activo ? "Activo" : "Inactivo"}
                         </span>
@@ -226,27 +224,43 @@ export default function SettingsPage() {
 }
 
 function ShippingModal({ isOpen, onClose, method }) {
-  const queryClient = useQuery({ queryKey: [] });
+  const queryClient = useQueryClient();
   const { register, handleSubmit, reset } = useForm({
     defaultValues: method || {},
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      reset(
+        method || {
+          nombre: "",
+          descripcion: "",
+          precio: "",
+          dias_entrega_min: "",
+          dias_entrega_max: "",
+          activo: 1,
+        },
+      );
+    }
+  }, [isOpen, method, reset]);
 
   const mutation = useMutation({
     mutationFn: (data) =>
       method
         ? adminAPI.updateShipping(method.id, {
-            ...data,
-            precio: Number(data.precio),
-            dias_entrega_min: Number(data.dias_entrega_min),
-            dias_entrega_max: Number(data.dias_entrega_max),
-          })
+          ...data,
+          precio: Number(data.precio),
+          dias_entrega_min: Number(data.dias_entrega_min),
+          dias_entrega_max: Number(data.dias_entrega_max),
+        })
         : adminAPI.createShipping({
-            ...data,
-            precio: Number(data.precio),
-            dias_entrega_min: Number(data.dias_entrega_min),
-            dias_entrega_max: Number(data.dias_entrega_max),
-          }),
+          ...data,
+          precio: Number(data.precio),
+          dias_entrega_min: Number(data.dias_entrega_min),
+          dias_entrega_max: Number(data.dias_entrega_max),
+        }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-shipping"] });
       toast.success(method ? "Método actualizado" : "Método creado");
       reset();
       onClose();
